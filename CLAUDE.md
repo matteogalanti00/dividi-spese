@@ -20,12 +20,13 @@ App web di una sola pagina per dividere le spese di gruppo e calcolare chi deve 
   - **Render**: `render()` ridisegna la pagina a partire dallo stato.
   - **Eventi**: gestori dei form e dei click (delegati su `document`).
 - `test.js`: test automatici della LOGICA. Estrae il blocco LOGICA da `index.html` e lo esegue.
+- `test-interfaccia.js`: test dell'interfaccia con Playwright (browser headless 390×844). Se Playwright manca, si salta da solo.
 - `README.md`: presentazione del progetto.
 
 ## Regole tecniche
 - **Soldi sempre in centesimi interi** (1250 = 12,50 €), mai numeri decimali.
 - Ogni nuova funzione di calcolo va nel blocco LOGICA e deve avere un test in `test.js`.
-- Prima di ogni commit: `node test.js` deve dare 0 test falliti.
+- Prima di ogni commit: `node test.js` e `node test-interfaccia.js` devono dare 0 test falliti.
 - Per cambiamenti all'interfaccia, se possibile verificare anche in un browser headless (es. Playwright) a dimensione telefono (390×844) e controllare che non ci siano errori JavaScript.
 - Testi dell'interfaccia in italiano, pensati per l'uso da telefono.
 - Niente `alert`/`confirm`/`prompt`: usare messaggi e conferme dentro la pagina.
