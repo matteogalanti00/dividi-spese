@@ -234,6 +234,10 @@ function currentSummary() {
 function render() {
   const { people, expenses } = state;
 
+  // I dati sono cambiati: i vecchi messaggi d'errore non valgono più
+  $("personError").textContent = "";
+  $("expenseError").textContent = "";
+
   $("people").innerHTML = people.length
     ? people.map(p => `<span class="chip">${esc(p.name)}<button data-del-person="${p.id}" aria-label="Rimuovi ${esc(p.name)}">×</button></span>`).join("")
     : `<span class="empty">Nessuno ancora. Aggiungi almeno due persone.</span>`;
@@ -312,6 +316,10 @@ $("expenseForm").addEventListener("submit", ev => {
   $("desc").value = ""; $("amount").value = "";
   save(); render(); $("desc").focus();
 });
+
+// Appena l'utente corregge un campo, l'errore di quel form sparisce
+$("personForm").addEventListener("input", () => $("personError").textContent = "");
+$("expenseForm").addEventListener("input", () => $("expenseError").textContent = "");
 
 document.addEventListener("click", ev => {
   const pid = ev.target.dataset.delPerson;
