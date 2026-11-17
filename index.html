@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dividi le spese</title>
+<style>
+  /* ===== CSS: l'aspetto della pagina ===== */
+  :root {
+    --bg: #f6f4ef; --card: #ffffff; --ink: #1f2328; --muted: #6b6f76;
+    --line: #e4e1d9; --accent: #2f6f5e; --accent-soft: #e3efe9;
+    --pos: #1f7a4d; --neg: #b3402f; --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#16181b; --card:#1f2226; --ink:#eceae5; --muted:#9a9ea5;
+            --line:#30343a; --accent:#6fbfa6; --accent-soft:#1f3a32;
+            --pos:#6fcf97; --neg:#f08a7a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font: 16px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 20px 16px 60px; }
+  h1 { font-size: 1.6rem; margin: 8px 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  section { background:var(--card); border:1px solid var(--line);
+            border-radius:var(--radius); padding:16px; margin-bottom:14px; }
+  h2 { font-size: 1.05rem; margin: 0 0 12px; display:flex; align-items:center; gap:8px; }
+  .step { background:var(--accent); color:#fff; border-radius:50%; width:24px; height:24px;
+          display:inline-grid; place-items:center; font-size:.8rem; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; }
+  .row > * { flex: 1 1 140px; }
+  input, select, button { font: inherit; }
+  input[type=text], select {
+    width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px;
+    background:var(--bg); color:var(--ink);
+  }
+  label.field { display:block; font-size:.85rem; color:var(--muted); margin:10px 0 4px; }
+  button { border:0; border-radius:10px; padding:10px 14px; cursor:pointer;
+           background:var(--accent); color:#fff; font-weight:600; flex:0 0 auto; }
+  button.ghost { background:transparent; color:var(--muted); border:1px solid var(--line); font-weight:500; }
+  button.link { background:none; color:var(--muted); padding:4px 8px; font-weight:400; }
+  .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+  .chip { background:var(--accent-soft); border-radius:999px; padding:6px 6px 6px 12px;
+          display:flex; align-items:center; gap:4px; }
+  .chip button { padding:2px 8px; background:none; color:var(--muted); }
+  .checks { display:flex; flex-wrap:wrap; gap:6px 14px; }
+  .checks label { display:flex; align-items:center; gap:6px; }
+  .error { color:var(--neg); font-size:.9rem; min-height:1.2em; margin-top:8px; }
+  .empty { color:var(--muted); font-style:italic; }
+  ul.list { list-style:none; margin:0; padding:0; }
+  ul.list li { display:flex; justify-content:space-between; align-items:center; gap:10px;
+               padding:10px 0; border-top:1px solid var(--line); }
+  ul.list li:first-child { border-top:0; }
+  .meta { color:var(--muted); font-size:.85rem; }
+  .amount { font-variant-numeric: tabular-nums; font-weight:600; white-space:nowrap; }
+  .pos { color:var(--pos); } .neg { color:var(--neg); }
+  table { width:100%; border-collapse:collapse; font-variant-numeric: tabular-nums; }
+  th, td { text-align:right; padding:8px 4px; border-top:1px solid var(--line); }
+  th:first-child, td:first-child { text-align:left; }
+  th { color:var(--muted); font-weight:500; font-size:.85rem; border-top:0; }
+  .transfer { font-size:1.05rem; }
+  .arrow { color:var(--muted); margin:0 6px; }
+  .done { background:var(--accent-soft); border-radius:10px; padding:12px; text-align:center; }
+  footer { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:20px; }
+  .confirm { display:none; gap:8px; align-items:center; justify-content:center; width:100%; }
+  .confirm.show { display:flex; }
+  .total { text-align:right; margin-top:8px; color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <!-- ===== HTML: la struttura della pagina ===== -->
+  <h1>💸 Dividi le spese</h1>
+  <p class="sub">Aggiungi chi c'era, inserisci le spese e scopri chi deve quanto a chi.</p>
+
+  <section>
+    <h2><span class="step">1</span> Partecipanti</h2>
+    <form id="personForm" class="row">
+      <input type="text" id="personName" placeholder="Nome (es. Giulia)" maxlength="30" autocomplete="off">
+      <button type="submit">Aggiungi</button>
+    </form>
+    <div class="error" id="personError"></div>
+    <div class="chips" id="people"></div>
+  </section>
+
+  <section>
+    <h2><span class="step">2</span> Nuova spesa</h2>
+    <form id="expenseForm">
+      <div class="row">
+        <div><label class="field" for="desc">Descrizione</label>
+          <input type="text" id="desc" placeholder="es. Cena da Mario" maxlength="60"></div>
+        <div><label class="field" for="amount">Importo (€)</label>
+          <input type="text" id="amount" inputmode="decimal" placeholder="es. 84,50"></div>
+      </div>
+      <label class="field" for="payer">Pagato da</label>
+      <select id="payer"></select>
+      <label class="field">Diviso tra</label>
+      <div class="checks" id="among"></div>
+      <div class="error" id="expenseError"></div>
+      <button type="submit" style="width:100%">Aggiungi spesa</button>
+    </form>
+  </section>
+
+  <section>
+    <h2><span class="step">3</span> Spese inserite</h2>
+    <ul class="list" id="expenses"></ul>
+    <div class="total" id="total"></div>
+  </section>
+
+  <section>
+    <h2><span class="step">4</span> Saldi</h2>
+    <div id="balances"></div>
+  </section>
+
+  <section>
+    <h2><span class="step">5</span> Chi deve a chi</h2>
+    <div id="transfers"></div>
+  </section>
+
+  <footer>
+    <button class="ghost" id="exampleBtn">Carica un esempio</button>
+    <button class="ghost" id="resetBtn">Cancella tutto</button>
+    <div class="confirm" id="confirmBox">
+      <span>Sicuro? Si perdono tutti i dati.</span>
+      <button id="confirmYes">Sì, cancella</button>
+      <button class="ghost" id="confirmNo">No</button>
+    </div>
+  </footer>
+</main>
+
+<script>
+// ===== JAVASCRIPT: il comportamento =====
+
+// === LOGICA START ===
+// Funzioni "pure": ricevono dati e restituiscono risultati, senza toccare la pagina.
+// Per questo si possono testare da sole.
+
+/** Converte testo come "12,50" o "1.234,56" in centesimi interi (1250). Restituisce null se non valido. */
+function parseEuro(text) {
+  let t = String(text).trim().replace(/\s|€/g, "");
+  if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");
+  if (!/^\d+(\.\d{1,2})?$/.test(t)) return null;
+  const cents = Math.round(parseFloat(t) * 100);
+  return cents > 0 ? cents : null;
+}
+
+/** Divide un importo in centesimi tra n persone. I centesimi avanzati vanno ai primi. */
+function splitCents(total, n) {
+  const base = Math.floor(total / n);
+  const rest = total - base * n;
+  return Array.from({ length: n }, (_, i) => base + (i < rest ? 1 : 0));
+}
+
+/** Per ogni persona: quanto ha pagato, quanto le spettava pagare, e il saldo (positivo = deve ricevere). */
+function computeBalances(people, expenses) {
+  const b = {};
+  people.forEach(p => b[p.id] = { paid: 0, share: 0 });
+  expenses.forEach(e => {
+    if (b[e.payerId]) b[e.payerId].paid += e.cents;
+    const among = e.among.filter(id => b[id]);
+    splitCents(e.cents, among.length).forEach((c, i) => b[among[i]].share += c);
+  });
+  Object.values(b).forEach(x => x.balance = x.paid - x.share);
+  return b;
+}
+
+/** Trova i rimborsi: chi deve di più paga a chi deve ricevere di più, finché tutti sono a zero. */
+function settle(balances) {
+  const creditors = [], debtors = [];
+  for (const [id, x] of Object.entries(balances)) {
+    if (x.balance > 0) creditors.push({ id, amt: x.balance });
+    if (x.balance < 0) debtors.push({ id, amt: -x.balance });
+  }
+  const out = [];
+  while (creditors.length && debtors.length) {
+    creditors.sort((a, b) => b.amt - a.amt);
+    debtors.sort((a, b) => b.amt - a.amt);
+    const c = creditors[0], d = debtors[0];
+    const amt = Math.min(c.amt, d.amt);
+    out.push({ from: d.id, to: c.id, cents: amt });
+    c.amt -= amt; d.amt -= amt;
+    if (c.amt === 0) creditors.shift();
+    if (d.amt === 0) debtors.shift();
+  }
+  return out;
+}
+// === LOGICA END ===
+
+// --- Stato: i dati dell'app ---
+const STORAGE_KEY = "dividi-spese-v1";
+let state = { people: [], expenses: [] };
+
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* memoria non disponibile: pazienza */ }
+}
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (s && Array.isArray(s.people) && Array.isArray(s.expenses)) state = s;
+  } catch (e) { /* nessun dato salvato */ }
+}
+
+const uid = () => Math.random().toString(36).slice(2, 9);
+const euro = c => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(c / 100);
+const nameOf = id => (state.people.find(p => p.id === id) || {}).name || "?";
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[ch]));
+
+// --- Disegno della pagina a partire dallo stato ---
+function render() {
+  const { people, expenses } = state;
+
+  $("people").innerHTML = people.length
+    ? people.map(p => `<span class="chip">${esc(p.name)}<button data-del-person="${p.id}" aria-label="Rimuovi ${esc(p.name)}">×</button></span>`).join("")
+    : `<span class="empty">Nessuno ancora. Aggiungi almeno due persone.</span>`;
+
+  const prevPayer = $("payer").value;
+  $("payer").innerHTML = people.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("");
+  if (people.some(p => p.id === prevPayer)) $("payer").value = prevPayer;
+
+  const prevChecked = new Set([...document.querySelectorAll("#among input:checked")].map(i => i.value));
+  const hadChecks = document.querySelectorAll("#among input").length > 0;
+  $("among").innerHTML = people.map(p =>
+    `<label><input type="checkbox" value="${p.id}" ${(!hadChecks || prevChecked.has(p.id) || !document.querySelector(`#among input[value="${p.id}"]`)) ? "checked" : ""}> ${esc(p.name)}</label>`
+  ).join("") || `<span class="empty">Prima aggiungi i partecipanti.</span>`;
+
+  $("expenses").innerHTML = expenses.length
+    ? expenses.map(e => `<li>
+        <div><div>${esc(e.desc)}</div>
+          <div class="meta">pagato da ${esc(nameOf(e.payerId))} · diviso tra ${e.among.length === people.length ? "tutti" : e.among.map(id => esc(nameOf(id))).join(", ")}</div></div>
+        <div style="display:flex;align-items:center"><span class="amount">${euro(e.cents)}</span>
+          <button class="link" data-del-expense="${e.id}" aria-label="Elimina spesa">✕</button></div>
+      </li>`).join("")
+    : `<li class="empty">Nessuna spesa ancora.</li>`;
+  const tot = expenses.reduce((s, e) => s + e.cents, 0);
+  $("total").textContent = expenses.length ? `Totale: ${euro(tot)}` : "";
+
+  const bal = computeBalances(people, expenses);
+  $("balances").innerHTML = people.length && expenses.length
+    ? `<table><tr><th>Persona</th><th>Ha pagato</th><th>Sua quota</th><th>Saldo</th></tr>
+       ${people.map(p => { const x = bal[p.id];
+         return `<tr><td>${esc(p.name)}</td><td>${euro(x.paid)}</td><td>${euro(x.share)}</td>
+                 <td class="${x.balance > 0 ? "pos" : x.balance < 0 ? "neg" : ""}">${x.balance > 0 ? "+" : ""}${euro(x.balance)}</td></tr>`; }).join("")}
+       </table><p class="meta">Saldo positivo = deve ricevere soldi. Negativo = deve darne.</p>`
+    : `<span class="empty">I saldi appariranno quando inserisci una spesa.</span>`;
+
+  const tr = settle(bal);
+  $("transfers").innerHTML = !expenses.length
+    ? `<span class="empty">Ancora niente da calcolare.</span>`
+    : tr.length
+      ? `<ul class="list">${tr.map(t => `<li class="transfer"><span><b>${esc(nameOf(t.from))}</b><span class="arrow">→</span><b>${esc(nameOf(t.to))}</b></span><span class="amount">${euro(t.cents)}</span></li>`).join("")}</ul>
+         <p class="meta">${tr.length} ${tr.length === 1 ? "bonifico" : "bonifici"} e siete pari.</p>`
+      : `<div class="done">🎉 Siete già pari, nessuno deve niente!</div>`;
+}
+
+// --- Eventi: cosa succede quando l'utente fa qualcosa ---
+$("personForm").addEventListener("submit", ev => {
+  ev.preventDefault();
+  const name = $("personName").value.trim();
+  $("personError").textContent = "";
+  if (!name) return;
+  if (state.people.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+    $("personError").textContent = "C'è già qualcuno con questo nome."; return;
+  }
+  state.people.push({ id: uid(), name });
+  $("personName").value = "";
+  save(); render(); $("personName").focus();
+});
+
+$("expenseForm").addEventListener("submit", ev => {
+  ev.preventDefault();
+  const err = msg => $("expenseError").textContent = msg;
+  const desc = $("desc").value.trim() || "Spesa";
+  const cents = parseEuro($("amount").value);
+  const payerId = $("payer").value;
+  const among = [...document.querySelectorAll("#among input:checked")].map(i => i.value);
+  if (state.people.length < 2) return err("Servono almeno due partecipanti.");
+  if (cents === null) return err("Importo non valido. Scrivi ad esempio 12,50.");
+  if (!among.length) return err("Scegli almeno una persona tra cui dividere.");
+  err("");
+  state.expenses.push({ id: uid(), desc, cents, payerId, among });
+  $("desc").value = ""; $("amount").value = "";
+  save(); render(); $("desc").focus();
+});
+
+document.addEventListener("click", ev => {
+  const pid = ev.target.dataset.delPerson;
+  if (pid) {
+    const used = state.expenses.some(e => e.payerId === pid || e.among.includes(pid));
+    if (used) { $("personError").textContent = `${nameOf(pid)} compare in qualche spesa: elimina prima quelle.`; return; }
+    state.people = state.people.filter(p => p.id !== pid);
+    $("personError").textContent = "";
+    save(); render();
+  }
+  const eid = ev.target.dataset.delExpense;
+  if (eid) { state.expenses = state.expenses.filter(e => e.id !== eid); save(); render(); }
+});
+
+$("resetBtn").addEventListener("click", () => $("confirmBox").classList.add("show"));
+$("confirmNo").addEventListener("click", () => $("confirmBox").classList.remove("show"));
+$("confirmYes").addEventListener("click", () => {
+  state = { people: [], expenses: [] };
+  $("confirmBox").classList.remove("show");
+  $("among").innerHTML = "";
+  save(); render();
+});
+
+$("exampleBtn").addEventListener("click", () => {
+  const [a, b, c, d] = ["Giulia", "Marco", "Sara", "Luca"].map(name => ({ id: uid(), name }));
+  state = {
+    people: [a, b, c, d],
+    expenses: [
+      { id: uid(), desc: "Affitto casa al mare", cents: 48000, payerId: a.id, among: [a.id, b.id, c.id, d.id] },
+      { id: uid(), desc: "Spesa al supermercato", cents: 9340, payerId: b.id, among: [a.id, b.id, c.id, d.id] },
+      { id: uid(), desc: "Benzina", cents: 7000, payerId: c.id, among: [a.id, b.id, c.id, d.id] },
+      { id: uid(), desc: "Gita in barca (Luca non c'era)", cents: 12000, payerId: b.id, among: [a.id, b.id, c.id] },
+    ],
+  };
+  $("among").innerHTML = "";
+  save(); render();
+});
+
+load();
+render();
+</script>
+</body>
+</html>
