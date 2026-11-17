@@ -65,6 +65,12 @@
   .confirm { display:none; gap:8px; align-items:center; justify-content:center; width:100%; }
   .confirm.show { display:flex; }
   .total { text-align:right; margin-top:8px; color:var(--muted); }
+  .share { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
+  .share > * { flex:1 1 160px; text-align:center; }
+  a.wa { background:#25D366; color:#fff; border-radius:10px; padding:10px 14px;
+         font-weight:600; text-decoration:none; }
+  #copyFallback { display:none; width:100%; margin-top:8px; padding:10px; font:inherit;
+                  border:1px solid var(--line); border-radius:10px; background:var(--bg); color:var(--ink); }
 </style>
 </head>
 <body>
@@ -184,6 +190,17 @@ function settle(balances) {
   }
   return out;
 }
+
+/** Formatta centesimi come euro italiani: 1250 -> "12,50 €". */
+function formatEuro(c) {
+  return new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(c / 100);
+}
+
+/** Crea il messaggio da condividere (es. su WhatsApp) con l'elenco dei rimborsi. */
+function summaryText(transfers, nameOf, totalCents) {
+  const lines = transfers.map(t => `• ${nameOf(t.from)} → ${nameOf(t.to)}: ${formatEuro(t.cents)}`);
+  return ["💸 Chi deve a chi", ...lines, "", `Totale spese: ${formatEuro(totalCents)}`].join("\n");
+}
 // === LOGICA END ===
 
 // --- Stato: i dati dell'app ---
@@ -201,10 +218,17 @@ function load() {
 }
 
 const uid = () => Math.random().toString(36).slice(2, 9);
-const euro = c => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(c / 100);
+const euro = formatEuro;
 const nameOf = id => (state.people.find(p => p.id === id) || {}).name || "?";
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, ch => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[ch]));
+
+/** Il messaggio di riepilogo per i dati attuali. */
+function currentSummary() {
+  const tr = settle(computeBalances(state.people, state.expenses));
+  const tot = state.expenses.reduce((s, e) => s + e.cents, 0);
+  return summaryText(tr, nameOf, tot);
+}
 
 // --- Disegno della pagina a partire dallo stato ---
 function render() {
@@ -249,7 +273,13 @@ function render() {
     ? `<span class="empty">Ancora niente da calcolare.</span>`
     : tr.length
       ? `<ul class="list">${tr.map(t => `<li class="transfer"><span><b>${esc(nameOf(t.from))}</b><span class="arrow">→</span><b>${esc(nameOf(t.to))}</b></span><span class="amount">${euro(t.cents)}</span></li>`).join("")}</ul>
-         <p class="meta">${tr.length} ${tr.length === 1 ? "bonifico" : "bonifici"} e siete pari.</p>`
+         <p class="meta">${tr.length} ${tr.length === 1 ? "bonifico" : "bonifici"} e siete pari.</p>
+         <div class="share">
+           <button id="copyBtn">📋 Copia testo</button>
+           <a class="wa" href="https://wa.me/?text=${encodeURIComponent(currentSummary())}" target="_blank" rel="noopener">Invia su WhatsApp</a>
+         </div>
+         <div class="meta" id="copyMsg"></div>
+         <textarea id="copyFallback" rows="6" readonly></textarea>`
       : `<div class="done">🎉 Siete già pari, nessuno deve niente!</div>`;
 }
 
@@ -291,6 +321,19 @@ document.addEventListener("click", ev => {
     state.people = state.people.filter(p => p.id !== pid);
     $("personError").textContent = "";
     save(); render();
+  }
+  if (ev.target.id === "copyBtn") {
+    const text = currentSummary();
+    const fallback = () => {   // piano B: mostra il testo selezionato da copiare a mano
+      const ta = $("copyFallback");
+      ta.value = text; ta.style.display = "block"; ta.focus(); ta.select();
+      $("copyMsg").textContent = "Copia automatica non disponibile: il testo è selezionato qui sotto, copialo a mano.";
+    };
+    try {
+      navigator.clipboard.writeText(text).then(
+        () => $("copyMsg").textContent = "✅ Copiato! Ora incollalo dove vuoi.",
+        fallback);
+    } catch (e) { fallback(); }
   }
   const eid = ev.target.dataset.delExpense;
   if (eid) { state.expenses = state.expenses.filter(e => e.id !== eid); save(); render(); }

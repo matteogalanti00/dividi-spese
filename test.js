@@ -2,8 +2,8 @@
 const fs = require("fs");
 const html = fs.readFileSync(__dirname + "/index.html", "utf8");
 const code = html.split("// === LOGICA START ===")[1].split("// === LOGICA END ===")[0];
-const { parseEuro, splitCents, computeBalances, settle } =
-  new Function(code + "; return { parseEuro, splitCents, computeBalances, settle };")();
+const { parseEuro, splitCents, computeBalances, settle, summaryText } =
+  new Function(code + "; return { parseEuro, splitCents, computeBalances, settle, summaryText };")();
 
 let ok = 0, fail = 0;
 function check(name, got, expected) {
@@ -46,7 +46,14 @@ bal = computeBalances(P, [{ cents: 2000, payerId: "C", among: ["A", "B"] }]);
 check("C paga per A e B ma non partecipa: A e B danno 10 € a C",
   settle(bal).map(t => t.cents), [1000, 1000]);
 
-// 4. Prova "a tappeto": 500 gruppi casuali, i conti devono sempre tornare
+// 4. Messaggio da condividere
+const names = { A: "Anna", B: "Bruno" };
+const msg = summaryText([{ from: "B", to: "A", cents: 1550 }], id => names[id], 3100)
+  .replace(/ /g, " "); // gli euro italiani usano uno spazio speciale prima del simbolo
+check("Il messaggio WhatsApp è scritto bene", msg,
+  "💸 Chi deve a chi\n• Bruno → Anna: 15,50 €\n\nTotale spese: 31,00 €");
+
+// 5. Prova "a tappeto": 500 gruppi casuali, i conti devono sempre tornare
 let allGood = true;
 for (let k = 0; k < 500; k++) {
   const n = 2 + Math.floor(Math.random() * 6);
